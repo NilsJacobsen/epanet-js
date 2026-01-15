@@ -10,6 +10,8 @@ import type { fileSave as fileSaveType } from "browser-fs-access";
 import { useAtomValue, useSetAtom } from "jotai";
 import { notifyPromiseState } from "src/components/notifications";
 import { useUserTracking } from "src/infra/user-tracking";
+import { useLegitFs } from "src/components/legit-fs-provider";
+import { captureError } from "src/infra/error-tracking";
 
 const getDefaultFsAccess = async () => {
   const { fileSave } = await import("browser-fs-access");
@@ -31,6 +33,7 @@ export const useSaveInp = ({
   const fileInfo = useAtomValue(fileInfoAtom);
   const userTracking = useUserTracking();
   const isCustomerDemandsOn = useFeatureFlag("FLAG_CUSTOMER_DEMANDS");
+  const legitFs = useLegitFs();
 
   const saveInp = useAtomCallback(
     useCallback(
@@ -64,6 +67,19 @@ export const useSaveInp = ({
           const inp = buildInpFn(data.hydraulicModel, buildOptions);
           const inpBlob = new Blob([inp], { type: "text/plain" });
 
+          // save to versioned memory file system
+          if (legitFs) {
+            try {
+              await legitFs.promises.writeFile(
+                fileInfo ? fileInfo.name : "my-network.inp",
+                inp,
+              );
+            } catch (error) {
+              captureError(error as Error);
+            }
+          }
+
+          // save to local file system
           const newHandle = await fileSave(
             inpBlob,
             {
@@ -99,7 +115,7 @@ export const useSaveInp = ({
           return false;
         }
       },
-      [getFsAccess, userTracking, translate, isCustomerDemandsOn],
+      [getFsAccess, userTracking, translate, isCustomerDemandsOn, legitFs],
     ),
   );
 

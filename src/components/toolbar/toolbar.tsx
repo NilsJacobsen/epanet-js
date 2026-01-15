@@ -60,6 +60,7 @@ import {
 import { useRunSimulationPerformanceTest } from "src/commands/run-simulation-performance-test";
 import { isDebugOn } from "src/infra/debug-mode";
 import { useFeatureFlag } from "src/hooks/use-feature-flags";
+import { BranchDropdown } from "./branch-dropdown";
 
 export const Toolbar = ({ readonly = false }: { readonly?: boolean }) => {
   const translate = useTranslate();
@@ -127,6 +128,8 @@ export const Toolbar = ({ readonly = false }: { readonly?: boolean }) => {
         >
           <ImportCustomerPointsIcon />
         </MenuAction>
+        <Divider />
+        <BranchDropdown />
         <Divider />
         {isMdOrLarger && (
           <>
