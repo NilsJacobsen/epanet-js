@@ -15,6 +15,7 @@ import {
   PanelRightActiveIcon,
   PanelRightIcon,
   TimerIcon,
+  UploadIcon,
 } from "src/icons";
 import Modes from "../modes";
 import { useAtomValue } from "jotai";
@@ -61,10 +62,13 @@ import { useRunSimulationPerformanceTest } from "src/commands/run-simulation-per
 import { isDebugOn } from "src/infra/debug-mode";
 import { useFeatureFlag } from "src/hooks/use-feature-flags";
 import { BranchDropdown } from "./branch-dropdown";
+import { useExportInp } from "src/commands/export-inp";
+import { DownloadIcon } from "lucide-react";
 
 export const Toolbar = ({ readonly = false }: { readonly?: boolean }) => {
   const translate = useTranslate();
   const saveInp = useSaveInp();
+  const exportInp = useExportInp();
   const userTracking = useUserTracking();
   const runSimulation = useRunSimulation();
   const runPerformanceTest = useRunSimulationPerformanceTest();
@@ -115,6 +119,15 @@ export const Toolbar = ({ readonly = false }: { readonly?: boolean }) => {
               readOnlyHotkey={saveAsShortcut}
             >
               <SaveAllIcon />
+            </MenuAction>
+            <MenuAction
+              label="Export INP"
+              role="button"
+              onClick={() => {
+                void exportInp();
+              }}
+            >
+              <DownloadIcon size={16} />
             </MenuAction>
           </>
         }
