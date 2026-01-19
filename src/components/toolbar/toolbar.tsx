@@ -15,7 +15,6 @@ import {
   PanelRightActiveIcon,
   PanelRightIcon,
   TimerIcon,
-  UploadIcon,
 } from "src/icons";
 import Modes from "../modes";
 import { useAtomValue } from "jotai";
