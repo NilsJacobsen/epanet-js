@@ -6,6 +6,7 @@ import {
   UMoment,
   EMPTY_MOMENT,
   MomentInput,
+  Moment,
 } from "src/lib/persistence/moment";
 import { generateKeyBetween } from "fractional-indexing";
 import {
@@ -154,18 +155,144 @@ export class MemPersistence implements IPersistence {
       this.store.set(mapSyncMomentAtom, newMapSyncMoment);
     };
   }
+
+  getMomentLog(): MomentLog {
+    return this.store.get(momentLogAtom);
+  }
+
+  captureModelSnapshot(): { moment: Moment; stateId: string } {
+    const ctx = this.store.get(dataAtom);
+    const { hydraulicModel } = ctx;
+
+    const moment: Moment = {
+      note: "Scenario base snapshot",
+      putAssets: [...hydraulicModel.assets.values()],
+      deleteAssets: [],
+      putDemands: hydraulicModel.demands,
+      putEPSTiming: hydraulicModel.epsTiming,
+      putControls: hydraulicModel.controls,
+      putCustomerPoints: [...hydraulicModel.customerPoints.values()],
+      putCurves: [...hydraulicModel.curves.values()],
+    };
+
+    return { moment, stateId: hydraulicModel.version };
+  }
+
+  applySnapshot(
+    moment: MomentInput,
+    stateId: string,
+    mergeAssetsAndSettings = false,
+  ): void {
+    const current = this.store.get(mapSyncMomentAtom);
+
+    this.apply(stateId, moment, mergeAssetsAndSettings);
+
+    this.store.set(mapSyncMomentAtom, {
+      pointer: -1,
+      version: current.version + 1,
+    });
+  }
+
+  switchMomentLog(momentLog: MomentLog): void {
+    const current = this.store.get(mapSyncMomentAtom);
+    this.store.set(momentLogAtom, momentLog);
+    this.store.set(mapSyncMomentAtom, {
+      pointer: momentLog.getPointer(),
+      version: current.version + 1,
+    });
+  }
+
+  restoreToBase(baseSnapshot: { moment: Moment; stateId: string }): void {
+    const ctx = this.store.get(dataAtom);
+    const { hydraulicModel } = ctx;
+
+    const currentAssetIds = [...hydraulicModel.assets.keys()];
+    const baseAssetIds = new Set(
+      baseSnapshot.moment.putAssets.map((a) => a.id),
+    );
+
+    const assetsToDelete = currentAssetIds.filter(
+      (id) => !baseAssetIds.has(id),
+    );
+
+    for (const id of assetsToDelete) {
+      const asset = hydraulicModel.assets.get(id);
+      if (!asset) continue;
+
+      if (asset.isLink) {
+        hydraulicModel.assetIndex.removeLink(asset.id);
+      } else if (asset.isNode) {
+        hydraulicModel.assetIndex.removeNode(asset.id);
+      }
+
+      hydraulicModel.assets.delete(id);
+      hydraulicModel.topology.removeNode(id);
+      hydraulicModel.topology.removeLink(id);
+      hydraulicModel.labelManager.remove(asset.label, asset.type, asset.id);
+    }
+
+    this.applySnapshot(baseSnapshot.moment, baseSnapshot.stateId, true);
+  }
+
+  getModelVersion(): string {
+    const ctx = this.store.get(dataAtom);
+    return ctx.hydraulicModel.version;
+  }
+
+  setModelVersion(version: string): void {
+    const ctx = this.store.get(dataAtom);
+    this.store.set(dataAtom, {
+      ...ctx,
+      hydraulicModel: {
+        ...ctx.hydraulicModel,
+        version,
+      },
+    });
+  }
+
   /**
    * This could and should be improved. It does do some weird stuff:
    * we need to write to the moment log and to features.
    */
-  private apply(stateId: string, forwardMoment: MomentInput) {
+  private apply(
+    stateId: string,
+    forwardMoment: MomentInput,
+    mergeAssetsAndSettings = false,
+  ) {
     const ctx = this.store.get(dataAtom);
     let reverseMoment;
-    if (
+
+    const hasSettings =
       forwardMoment.putDemands ||
       forwardMoment.putEPSTiming ||
-      forwardMoment.putControls
-    ) {
+      forwardMoment.putControls;
+
+    if (mergeAssetsAndSettings || !hasSettings) {
+      const assetReverseMoment = UMoment.merge(
+        fMoment(forwardMoment.note || `Reverse`),
+        this.deleteAssetsInner(forwardMoment.deleteAssets, ctx),
+        this.putAssetsInner(forwardMoment.putAssets, ctx),
+        this.putCustomerPointsInner(forwardMoment.putCustomerPoints || [], ctx),
+        this.putCurvesInner(forwardMoment.putCurves, ctx),
+      );
+
+      if (mergeAssetsAndSettings && hasSettings) {
+        reverseMoment = {
+          ...assetReverseMoment,
+          putDemands: forwardMoment.putDemands
+            ? ctx.hydraulicModel.demands
+            : undefined,
+          putEPSTiming: forwardMoment.putEPSTiming
+            ? ctx.hydraulicModel.epsTiming
+            : undefined,
+          putControls: forwardMoment.putControls
+            ? ctx.hydraulicModel.controls
+            : undefined,
+        };
+      } else {
+        reverseMoment = assetReverseMoment;
+      }
+    } else {
       reverseMoment = {
         note: "Reverse simulation settings",
         putDemands: forwardMoment.putDemands
@@ -180,14 +307,6 @@ export class MemPersistence implements IPersistence {
         putAssets: [],
         deleteAssets: [],
       };
-    } else {
-      reverseMoment = UMoment.merge(
-        fMoment(forwardMoment.note || `Reverse`),
-        this.deleteAssetsInner(forwardMoment.deleteAssets, ctx),
-        this.putAssetsInner(forwardMoment.putAssets, ctx),
-        this.putCustomerPointsInner(forwardMoment.putCustomerPoints || [], ctx),
-        this.putCurvesInner(forwardMoment.putCurves, ctx),
-      );
     }
 
     const updatedHydraulicModel = updateHydraulicModelAssets(

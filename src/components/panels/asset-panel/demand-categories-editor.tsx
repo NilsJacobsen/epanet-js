@@ -2,9 +2,9 @@ import { useMemo, useCallback } from "react";
 import { keyColumn, Column } from "react-datasheet-grid";
 import {
   SpreadsheetTable,
-  createSelectColumn,
   createFloatColumn,
 } from "src/components/spreadsheet-table";
+import { createFilterableSelectColumn } from "src/components/spreadsheet-table/filterable-select-column";
 import { JunctionDemand, PatternId } from "src/hydraulic-model/demands";
 import { useTranslate } from "src/hooks/use-translate";
 import { DeleteIcon, AddIcon } from "src/icons";
@@ -142,19 +142,20 @@ export const DemandCategoriesEditor = ({
   const columns = useMemo(
     (): Partial<Column>[] => [
       {
-        ...keyColumn("baseDemand", createFloatColumn()),
+        ...keyColumn("baseDemand", createFloatColumn({ deleteValue: 0 })),
         title: translate("baseDemand"),
-        grow: 2,
+        grow: 6,
       },
       {
         ...keyColumn(
           "patternId",
-          createSelectColumn({
+          createFilterableSelectColumn({
             options: patternOptions,
+            deleteValue: CONSTANT_PATTERN_SENTINEL,
           }),
         ),
         title: translate("timePattern"),
-        grow: 3,
+        grow: 7,
       },
     ],
     [patternOptions, translate],

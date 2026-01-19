@@ -52,6 +52,7 @@ import { usePrivacySettings } from "src/hooks/use-privacy-settings";
 import { useFeatureFlag } from "src/hooks/use-feature-flags";
 import { initStorage } from "src/infra/storage";
 import { LegitFsProvider } from "./legit-fs-provider";
+import { useIsMainReadonly } from "src/hooks/use-is-main-readonly";
 
 type ResolvedLayout = "HORIZONTAL" | "VERTICAL" | "FLOATING";
 
@@ -74,6 +75,7 @@ export function EpanetApp() {
   const { enableAllTracking } = usePrivacySettings();
   const hasIdentifiedRef = useRef(false);
   const isCursorFamilyEnabled = useFeatureFlag("FLAG_CURSOR_FAMILY");
+  const isMainReadonly = useIsMainReadonly();
 
   useEffect(() => {
     void initStorage();
@@ -156,7 +158,7 @@ export function EpanetApp() {
         <MapContext.Provider value={map}>
           <div className="h-24">
             <MenuBarPlay />
-            <Toolbar />
+            <Toolbar readonly={isMainReadonly} />
           </div>
           <div
             className={clsx(

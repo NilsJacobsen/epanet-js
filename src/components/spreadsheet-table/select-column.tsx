@@ -11,6 +11,7 @@ type SelectOption<T extends string = string> = {
 type SelectColumnOptions<T extends string = string> = {
   options: SelectOption<T>[];
   placeholder?: string;
+  deleteValue?: T | null;
 };
 
 type SelectCellProps<T extends string = string> = {
@@ -42,7 +43,7 @@ const SelectCell: CellComponent<string | null, SelectCellProps> = ({
   }, [active, setActiveCell, columnIndex, rowIndex]);
 
   return (
-    <div className="w-full h-full [&>div]:w-full [&>div]:h-full [&_button]:w-full [&_button]:h-full">
+    <div className="w-full h-full [&>div]:w-full [&>div]:h-full [&_button]:w-full [&_button]:h-full [&_button]:pr-0">
       <Selector
         options={selectorOptions}
         selected={rowData}
@@ -80,6 +81,6 @@ export const createSelectColumn = <T extends string = string>(
     );
     return match ? match.value : null;
   },
-  deleteValue: () => null,
+  deleteValue: () => options.deleteValue ?? null,
   disableKeys: true,
 });
